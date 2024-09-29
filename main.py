@@ -1,6 +1,8 @@
 import subprocess
 import json
 import os
+from collections import defaultdict
+
 
 def generate_tags_file(project_path, tags_file_path):
     """Generate tags file using the ctags command."""
@@ -14,7 +16,7 @@ def generate_tags_file(project_path, tags_file_path):
 
 def parse_tags_file(tags_file_path):
     """Parse the generated tags file and return a list of tags."""
-    tags = []
+    tags = {}
 
     if not os.path.exists(tags_file_path):
         print(f"Tags file not found: {tags_file_path}")
@@ -31,19 +33,35 @@ def parse_tags_file(tags_file_path):
             if len(parts) >= 4:
                 tag_name = parts[0]
                 file_name = parts[1]
-                ex_command = parts[2]
+                ex_command = parts[2][2:].strip()
                 tag_field = parts[3].strip()
+                parent_block = parts[4].split(':')[-1].strip() if len(parts)>4 else None
 
-                # Create a dictionary for the current tag
                 tag_info = {
                     "tag_name": tag_name,
                     "file_name": file_name,
                     "ex_command": ex_command,
-                    "tag_field": tag_field
+                    "tag_field": tag_field,
+                    "parent_block": parent_block,
+                    "m": [],
+                    "f": [],
                 }
-                tags.append(tag_info)
+                tags[tag_name] = tag_info
 
-    return tags
+    classes = {t:tags[t] for t in tags if tags[t]["tag_field"] == "c"}
+    for t in tags:
+        if tags[t]["tag_field"] == "m":
+            parent_class = tags[t]["parent_block"]
+            if parent_class:
+                classes[parent_class]["m"].append(tags[t])
+    for t in tags:
+        if tags[t]["tag_field"] == "f":
+            parent_class = tags[t]["parent_block"]
+            if parent_class:
+                classes[parent_class]["f"].append(tags[t])
+
+
+    return { "c" : classes}
 
 def write_json_file(data, output_file_path):
     """Write the parsed tag data to a JSON file."""
@@ -52,10 +70,10 @@ def write_json_file(data, output_file_path):
 
 if __name__ == "__main__":
     # Path to the project you want to generate tags for
-    project_path = 'path_to_project'
+    project_path = 'D:\\Development\\Projects\\MapMyProject\\Test\\TestFiles'
 
     # Path to the tags file to be generated
-    tags_file = 'tags_file'
+    tags_file = 'tags'
 
     # Output path for the JSON file
     json_output_file = 'tags_output.json'
